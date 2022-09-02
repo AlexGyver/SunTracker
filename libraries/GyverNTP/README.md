@@ -1,0 +1,156 @@
+[![Foo](https://img.shields.io/badge/Version-1.3-brightgreen.svg?style=flat-square)](#versions)
+[![Foo](https://img.shields.io/badge/Website-AlexGyver.ru-blue.svg?style=flat-square)](https://alexgyver.ru/)
+[![Foo](https://img.shields.io/badge/%E2%82%BD$%E2%82%AC%20%D0%9D%D0%B0%20%D0%BF%D0%B8%D0%B2%D0%BE-%D1%81%20%D1%80%D1%8B%D0%B1%D0%BA%D0%BE%D0%B9-orange.svg?style=flat-square)](https://alexgyver.ru/support_alex/)
+
+[![Foo](https://img.shields.io/badge/README-ENGLISH-brightgreen.svg?style=for-the-badge)](https://github-com.translate.goog/GyverLibs/GyverNTP?_x_tr_sl=ru&_x_tr_tl=en)
+
+# GyverNTP
+Библиотека для получения точного времени с NTP сервера для esp8266/esp32
+- Работает на стандартной библиотеке WiFiUdp.h
+- Учёт времени ответа сервера и задержки соединения
+- Получение времени с точностью до нескольких миллисекунд
+- Получение UNIX-времени, а также миллисекунд, секунд, минут, часов, дня, месяца, года и дня недели
+- Синхронизация по таймеру
+- Обработка ошибок
+- Асинхронный режим
+
+### Совместимость
+esp8266, esp32
+
+## Содержание
+- [Установка](#install)
+- [Инициализация](#init)
+- [Использование](#usage)
+- [Пример](#example)
+- [Версии](#versions)
+- [Баги и обратная связь](#feedback)
+
+<a id="install"></a>
+## Установка
+- Библиотеку можно найти по названию **GyverNTP** и установить через менеджер библиотек в:
+    - Arduino IDE
+    - Arduino IDE v2
+    - PlatformIO
+- [Скачать библиотеку](https://github.com/GyverLibs/GyverNTP/archive/refs/heads/main.zip) .zip архивом для ручной установки:
+    - Распаковать и положить в *C:\Program Files (x86)\Arduino\libraries* (Windows x64)
+    - Распаковать и положить в *C:\Program Files\Arduino\libraries* (Windows x32)
+    - Распаковать и положить в *Документы/Arduino/libraries/*
+    - (Arduino IDE) автоматическая установка из .zip: *Скетч/Подключить библиотеку/Добавить .ZIP библиотеку…* и указать скачанный архив
+- Читай более подробную инструкцию по установке библиотек [здесь](https://alexgyver.ru/arduino-first/#%D0%A3%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0_%D0%B1%D0%B8%D0%B1%D0%BB%D0%B8%D0%BE%D1%82%D0%B5%D0%BA)
+
+<a id="init"></a>
+## Инициализация
+```cpp
+GyverNTP ntp;               // параметры по умолчанию (gmt 0, период 3600 секунд (1 час))
+GyverNTP(gmt);              // часовой пояс в часах (например Москва 3)
+GyverNTP(gmt, period);      // часовой пояс в часах и период обновления в секундах
+```
+
+<a id="usage"></a>
+## Использование
+```cpp
+bool begin();                   // запустить
+void end();                     // остановить
+
+void setGMTminute(int16_t gmt); // установить часовой пояс в минутах
+void setGMT(int8_t gmt);        // установить часовой пояс в часах
+void setPeriod(uint16_t prd);   // установить период обновления в секундах
+void setHost(char* host);       // установить хост (по умолч. "pool.ntp.org")
+void asyncMode(bool f);         // асинхронный режим (по умолч. включен, true)
+void ignorePing(bool f);        // не учитывать пинг соединения (умолч. false)
+
+uint8_t tick();                 // тикер, обновляет время по своему таймеру. Вернёт true если произошла попытка обновления
+uint8_t updateNow();            // вручную запросить и обновить время с сервера. Вернёт статус (см. ниже)
+uint32_t unix();                // unix время
+
+uint16_t ms();                  // миллисекунды текущей секунды
+uint8_t second();               // получить секунды
+uint8_t minute();               // получить минуты
+uint8_t hour();                 // получить часы
+uint8_t day();                  // получить день месяца
+uint8_t month();                // получить месяц
+uint16_t year();                // получить год
+uint8_t dayWeek();              // получить день недели
+
+String timeString();            // получить строку времени формата ЧЧ:ММ:СС
+String dateString();            // получить строку даты формата ДД.ММ.ГГГГ
+
+bool synced();                  // получить статус текущего времени, true - синхронизировано
+bool busy();                    // вернёт true, если tick ожидает ответа сервера в асинхронном режиме
+int16_t ping();                 // получить пинг сервера
+uint8_t status();               // получить статус системы
+
+// 0 - всё ок
+// 1 - не запущен UDP
+// 2 - не подключен WiFi
+// 3 - ошибка подключения к серверу
+// 4 - ошибка отправки пакета
+// 5 - таймаут ответа сервера
+// 6 - получен некорректный ответ сервера
+```
+
+### Особенности
+- Нужно вызывать `tick()` в главном цикле программы `loop()`, он синхронизирует время по своему таймеру
+- Если основной цикл программы сильно загружен, а время нужно получать с максимальной точностью (несколько мс), то можно выключить асинхронный режим `asyncMode(false)`
+- Библиотека продолжает считать время даже после пропадания синхронизации
+    - По моим тестам esp "уходит" на ~1.7 секунды за сутки (без синхронизации). Поэтому стандартный период синхронизации выбран 1 час
+
+<a id="example"></a>
+## Пример
+```cpp
+// пример выводит время каждую секунду
+// а также два раза в секунду мигает светодиодом
+// можно прошить на несколько плат - они будут мигать синхронно
+
+#include <ESP8266WiFi.h>  // esp8266
+//#include <WiFi.h>       // esp32
+
+#include <GyverNTP.h>
+GyverNTP ntp(3);
+
+// список серверов, если "pool.ntp.org" не работает
+//"ntp1.stratum2.ru"
+//"ntp2.stratum2.ru"
+//"ntp.msk-ix.ru"
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  Serial.begin(115200);
+  WiFi.begin("WIFI_SSID", "WIFI_PASS");
+  while (WiFi.status() != WL_CONNECTED) delay(100);
+  Serial.println("Connected");
+
+  ntp.begin();
+  //ntp.asyncMode(false);   // выключить асинхронный режим
+  //ntp.ignorePing(true);   // не учитывать пинг до сервера
+}
+
+void loop() {
+  ntp.tick();
+  
+  if (ntp.ms() == 0) {
+    delay(1);
+    digitalWrite(LED_BUILTIN, 1);
+  }
+  if (ntp.ms() == 500) {
+    delay(1);
+    digitalWrite(LED_BUILTIN, 0);
+    Serial.println(ntp.timeString());
+    Serial.println(ntp.dateString());
+    Serial.println();
+  }
+}
+```
+
+<a id="versions"></a>
+## Версии
+- v1.0
+- v1.1 - мелкие улучшения и gmt в минутах
+- v1.2 - оптимизация, улучшена стабильность, добавлен асинхронный режим
+- v1.2.1 - изменён стандартный период обновления
+- v1.3 - ускорена синхронизация при запуске в асинхронном режиме
+
+<a id="feedback"></a>
+## Баги и обратная связь
+При нахождении багов создавайте **Issue**, а лучше сразу пишите на почту [alex@alexgyver.ru](mailto:alex@alexgyver.ru)  
+Библиотека открыта для доработки и ваших **Pull Request**'ов!
